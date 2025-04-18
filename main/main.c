@@ -11,6 +11,7 @@
 
 void controller_task(void *pvParameters)
 {
+    uint8_t motor_dir = 0;
     // Main task
     while (1)
     {
@@ -19,11 +20,15 @@ void controller_task(void *pvParameters)
         printf("ADC Value: %d\n", adc_value);
         float adc_voltage = adc_read_batteryVoltage();
         printf("ADC Voltage: %.04f volts\n", adc_voltage);
-        // Send data via BLE
-        send_data_via_ble(adc_value);
+        send_motor_speed((uint8_t)(adc_value >> 8)); // Send motor speed via BLE
+        motor_dir ^= 1; // Toggle motor direction
+        send_motor_direction(motor_dir); // Send motor direction via BLE
+        vTaskDelay(pdMS_TO_TICKS(3000)); // Delay for 3 seconds
 
-        uint16_t data = read_data_via_ble();
-        printf("Data from BLE: %d\n", data);
+        //read battery voltage and level via BLE
+        float battery_voltage = read_battery_voltage();
+        uint8_t battery_level = read_battery_level();
+        printf("Battery Voltage: %.02f V bettery level %d\n", battery_voltage, battery_level);
         vTaskDelay(pdMS_TO_TICKS(3000));
     }
 }

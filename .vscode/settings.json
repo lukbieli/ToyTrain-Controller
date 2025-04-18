@@ -8,7 +8,10 @@
     "idf.portWin": "COM7",
     "idf.toolsPathWin": "C:\\Users\\Lukasz\\.espressif",
     "files.associations": {
-        "cstdint": "c"
+        "cstdint": "c",
+        "esp_gatt_common_api.h": "c",
+        "chrono": "c",
+        "variant": "c"
     },
     "idf.flashType": "UART"
 }
