@@ -15,21 +15,24 @@ void controller_task(void *pvParameters)
     // Main task
     while (1)
     {
-        // Read ADC value
-        int16_t adc_value = adc_read_potentiometerRaw();
-        // printf("ADC Value: %d\n", adc_value);
-        float adc_voltage = adc_read_batteryVoltage();
-        // printf("ADC Voltage: %.04f volts\n", adc_voltage);
-        // Send ADC value to BLE
-        BleDriverCli_SetMotorSpeed((uint8_t)(adc_value >> 8)); // Send motor speed via BLE
-        motor_dir = (adc_value > 1.5f) ? 1 : 0; // Determine motor direction based on ADC value
-        BleDriverCli_SetMotorDirection(motor_dir); // Send motor direction via BLE
+        if(BleDriverCli_IsReady() == true)
+        {
+            // Read ADC value
+            int16_t adc_value = adc_read_potentiometerRaw();
+            // printf("ADC Value: %d\n", adc_value);
+            float adc_voltage = adc_read_batteryVoltage();
+            // printf("ADC Voltage: %.04f volts\n", adc_voltage);
+            // Send ADC value to BLE
+            BleDriverCli_SetMotorSpeed((uint8_t)(adc_value >> 8)); // Send motor speed via BLE
+            motor_dir = (adc_voltage > 1.5f) ? 1 : 0; // Determine motor direction based on ADC value
+            BleDriverCli_SetMotorDirection(motor_dir); // Send motor direction via BLE
 
-        //read battery voltage and level via BLE
-        float battery_voltage = BleDriverCli_GetBatteryVoltage();
-        uint8_t battery_level = BleDriverCli_GetBatteryLevel();
-        // printf("Battery Voltage: %.02f V bettery level %d\n", battery_voltage, battery_level);
-        ESP_LOGI("Task", "Motor Speed:%d Direction:%d Voltage:%.02f V Level:%d",adc_value >> 8, motor_dir, battery_voltage, battery_level);
+            //read battery voltage and level via BLE
+            float battery_voltage = BleDriverCli_GetBatteryVoltage();
+            uint8_t battery_level = BleDriverCli_GetBatteryLevel();
+            // printf("Battery Voltage: %.02f V bettery level %d\n", battery_voltage, battery_level);
+            ESP_LOGI("Task", "Motor Speed:%d Direction:%d Voltage:%.02f V Level:%d",adc_value >> 8, motor_dir, battery_voltage, battery_level);
+        }
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

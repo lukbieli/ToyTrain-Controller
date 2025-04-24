@@ -47,4 +47,13 @@ void BleDriverCli_SetMotorSpeed(uint8_t speed);
  */
 void BleDriverCli_SetMotorDirection(uint8_t direction);
 
+/**
+ * @brief Returns boolean value indicating if the connection is ready.
+ * 
+ * This function checks if the connection to the remote device is established and ready for communication.
+ * 
+ * @return true if the connection is ready, false otherwise.
+ */
+bool BleDriverCli_IsReady(void);
+
 #endif // BLE_COMM_H

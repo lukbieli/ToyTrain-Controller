@@ -256,6 +256,15 @@ static gattc_profile_inst_t gl_profile_tab[PROFILE_NUM] = {
 
 /* Global functions */
 
+bool BleDriverCli_IsReady(void)
+{
+    // Check if the connection is ready
+    if (gl_profile_tab[PROFILE_BATTERY_APP_ID].is_ready && gl_profile_tab[PROFILE_MOTOR_APP_ID].is_ready) {
+        return true; // Connection is ready
+    }
+    return false; // Connection is not ready
+}
+
 float BleDriverCli_GetBatteryVoltage(void)
 {
     // Read battery voltage from the characteristic
