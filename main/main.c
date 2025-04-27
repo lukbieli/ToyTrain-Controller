@@ -17,8 +17,8 @@ void controller_task(void *pvParameters)
     // Main task
     while (1)
     {
-        // if(BleDriverCli_IsReady() == true)
-        // {
+        if(BleDriverCli_IsReady() == true)
+        {
             // Read ADC value
             int16_t adc_value = adc_read_potentiometerRaw();
             // printf("ADC Value: %d\n", adc_value);
@@ -28,19 +28,19 @@ void controller_task(void *pvParameters)
 
             // Calculate motor speed and direction based on ADC value
             calculate_speed_and_direction(&motor_speed, &motor_dir, adc_value, adc_bat); // Calculate motor speed and direction based on ADC value
-            // printf("MotSpeed: %d, MotDir: %d AdcVal: %d, AdcBat: %d\n", motor_speed, motor_dir, adc_value, adc_bat);
+            printf("MotSpeed: %d, MotDir: %d AdcVal: %d, AdcBat: %d\n", motor_speed, motor_dir, adc_value, adc_bat);
             // printf("%d %d %d %d\n", motor_speed, motor_dir, adc_value, adc_bat);
 
             // Send ADC value to BLE
-            // BleDriverCli_SetMotorSpeed(motor_speed); // Send motor speed via BLE
-            // BleDriverCli_SetMotorDirection(motor_dir); // Send motor direction via BLE
+            BleDriverCli_SetMotorSpeed(motor_speed); // Send motor speed via BLE
+            BleDriverCli_SetMotorDirection(motor_dir); // Send motor direction via BLE
 
             //read battery voltage and level via BLE
-            // float battery_voltage = BleDriverCli_GetBatteryVoltage();
-            // uint8_t battery_level = BleDriverCli_GetBatteryLevel();
-            // printf("Battery Voltage: %.02f V bettery level %d\n", battery_voltage, battery_level);
+            float battery_voltage = BleDriverCli_GetBatteryVoltage();
+            uint8_t battery_level = BleDriverCli_GetBatteryLevel();
+            printf("Battery Voltage: %.02f V bettery level %d\n", battery_voltage, battery_level);
             // ESP_LOGI("Task", "Motor Speed:%d Direction:%d Voltage:%.02f V Level:%d",adc_value >> 8, motor_dir, battery_voltage, battery_level);
-        // }
+        }
         vTaskDelay(pdMS_TO_TICKS(20)); // Delay for 20ms
     }
 }
