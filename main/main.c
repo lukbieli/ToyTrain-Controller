@@ -38,10 +38,10 @@ void controller_task(void *pvParameters)
             //read battery voltage and level via BLE
             float battery_voltage = BleDriverCli_GetBatteryVoltage();
             uint8_t battery_level = BleDriverCli_GetBatteryLevel();
-            printf("Battery Voltage: %.02f V bettery level %d\n", battery_voltage, battery_level);
+            // printf("Battery Voltage: %.02f V bettery level %d\n", battery_voltage, battery_level);
             // ESP_LOGI("Task", "Motor Speed:%d Direction:%d Voltage:%.02f V Level:%d",adc_value >> 8, motor_dir, battery_voltage, battery_level);
         }
-        vTaskDelay(pdMS_TO_TICKS(20)); // Delay for 20ms
+        vTaskDelay(pdMS_TO_TICKS(50)); // Delay for 20ms
     }
 }
 
@@ -58,5 +58,5 @@ void app_main(void)
     xTaskCreatePinnedToCore(controller_task, "controller_task", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL, APP_CPU_NUM);
 
     // Start BLE task
-    // BleDriverCli_Setup();
+    BleDriverCli_Setup();
 }

@@ -78,6 +78,7 @@ typedef struct {
     // esp_attr_value_t cccd_val;           // CCCD value for notifications/indications
     bool is_ready;             // Flag to check if the characteristic is ready
     bool request_notify;           // Flag to check if notification is requested
+    volatile bool processing; // Flag to check if the characteristic is being processed
 } ble_characteristic_t;
 
 
@@ -290,7 +291,10 @@ uint8_t BleDriverCli_GetBatteryLevel(void)
 void BleDriverCli_SetMotorSpeed(uint8_t speed)
 {
     // Send motor speed via BLE
-    if (gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_SPEED].is_ready) {
+    if (gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_SPEED].is_ready == true && 
+        gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_SPEED].processing == false) {
+
+        gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_SPEED].processing = true; // Set processing flag to true
         MY_LOGD(GATTC_TAG, "Send motor speed via BLE: %d", speed);
         esp_err_t ret = esp_ble_gattc_write_char(gattc_conn.gattc_if,
                                                 gattc_conn.conn_id,
@@ -302,6 +306,7 @@ void BleDriverCli_SetMotorSpeed(uint8_t speed)
 
         if (ret){
             MY_LOGE(GATTC_TAG, "gattc write char failed, error code = %x", ret);
+            gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_SPEED].processing = false; // Reset processing flag
         }
     }
 }
@@ -309,7 +314,10 @@ void BleDriverCli_SetMotorSpeed(uint8_t speed)
 void BleDriverCli_SetMotorDirection(uint8_t direction)
 {
     // Send motor direction via BLE
-    if (gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_DIRECTION].is_ready) {
+    if (gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_DIRECTION].is_ready == true &&
+        gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_DIRECTION].processing == false) {
+        
+        gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_DIRECTION].processing = true; // Set processing flag to true
         MY_LOGD(GATTC_TAG, "Send motor direction via BLE: %d", direction);
         esp_err_t ret = esp_ble_gattc_write_char(gattc_conn.gattc_if,
                                                 gattc_conn.conn_id,
@@ -319,8 +327,10 @@ void BleDriverCli_SetMotorDirection(uint8_t direction)
                                                 ESP_GATT_WRITE_TYPE_RSP,
                                                 ESP_GATT_AUTH_REQ_NONE);
 
+
         if (ret){
             MY_LOGE(GATTC_TAG, "gattc write char failed, error code = %x", ret);
+            gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_DIRECTION].processing = false; // Reset processing flag
         }
     }
 }
@@ -964,6 +974,20 @@ static void espGattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_
             break;
         }
         MY_LOGD(GATTC_TAG, "Characteristic write successfully");
+        // find characteristic
+        p_char = NULL;
+        p_srv = findServiceByCharHandle(p_data->write.handle, &p_char);
+        if(p_srv == NULL){
+            MY_LOGE(GATTC_TAG, "[WRITE_CHAR_EVT] Service not found by handle %d", p_data->write.handle);
+            break;
+        }
+        else if(p_char == NULL){
+            MY_LOGE(GATTC_TAG, "[WRITE_CHAR_EVT] Characteristic not found by handle %d", p_data->write.handle);
+            break;
+        }
+        MY_LOGD(GATTC_TAG, "Profile %d: Characteristic handle: %d", p_srv->app_id, p_char->handle);
+        // end processing
+        p_char->processing = false;
         break;
 
     case ESP_GATTC_DISCONNECT_EVT:
@@ -972,6 +996,23 @@ static void espGattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_
                  ESP_BD_ADDR_HEX(p_data->disconnect.remote_bda), p_data->disconnect.reason);
 
         MY_LOGD(GATTC_TAG, "Start to scan again");
+        // clear all profiles
+        for(i = 0; i < PROFILE_NUM; i++){
+            gl_profile_tab[i].is_found = false;
+            gl_profile_tab[i].is_ready = false;
+            gl_profile_tab[i].currrentChar = 0;
+            for(int j = 0; j < gl_profile_tab[i].char_num; j++){
+                gl_profile_tab[i].chars[j].is_ready = false;
+                gl_profile_tab[i].chars[j].processing = false;
+            }
+        }
+        //clear connection id
+        gattc_conn.conn_id = 0xFFFF;
+        // gattc_conn.gattc_if = 0xFF;
+        //clear remote bd addr
+        memset(gattc_conn.remote_bda, 0, sizeof(esp_bd_addr_t));
+        
+
         //trigger scan again
         scan_ret = esp_ble_gap_set_scan_params(&ble_scan_params);
         if (scan_ret){
