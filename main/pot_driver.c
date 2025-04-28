@@ -29,7 +29,7 @@
  * Dead zone mid is claculated as middle of the adc_bat value.
  */
 
-#define POT_DEAD_ZONE_SIZE (10) // Dead zone size for motor speed adjustment in percentage
+#define POT_DEAD_ZONE_SIZE (20) // Dead zone size for motor speed adjustment in percentage
 
 
 /**

@@ -106,7 +106,7 @@ typedef struct{
 static volatile int readyFlag = 0;
 static volatile uint16_t dataRead = 0;
 
-static char remote_device_name[ESP_BLE_ADV_NAME_LEN_MAX] = "ESP_GATTS_DEMO"; // Remote device name
+static char remote_device_name[ESP_BLE_ADV_NAME_LEN_MAX] = "TTLoc_001"; // Remote device name
 static bool connect    = false; // Connection flag
 
 static esp_ble_gatt_creat_conn_params_t creat_conn_params = {0};

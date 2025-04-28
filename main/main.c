@@ -10,10 +10,18 @@
 #include "ble_driver_cli.h"
 #include "pot_driver.h"
 
+//
+
 void controller_task(void *pvParameters)
 {
     uint8_t motor_dir = 0;
     uint8_t motor_speed = 0;
+
+    // previous values
+    int16_t prev_adc_val = 0;
+    int16_t prev_adc_bat = 0;
+    uint8_t prev_motor_speed = 0;
+    uint8_t prev_motor_dir = 0;
     // Main task
     while (1)
     {
@@ -28,12 +36,25 @@ void controller_task(void *pvParameters)
 
             // Calculate motor speed and direction based on ADC value
             calculate_speed_and_direction(&motor_speed, &motor_dir, adc_value, adc_bat); // Calculate motor speed and direction based on ADC value
-            printf("MotSpeed: %d, MotDir: %d AdcVal: %d, AdcBat: %d\n", motor_speed, motor_dir, adc_value, adc_bat);
-            // printf("%d %d %d %d\n", motor_speed, motor_dir, adc_value, adc_bat);
+            //if motor_speed, motor_dir, adc_value, adc_bat are same as previous values, skip sending to BLE
+            if(motor_speed != prev_motor_speed || motor_dir != prev_motor_dir || adc_value != prev_adc_val || adc_bat != prev_adc_bat) {
 
-            // Send ADC value to BLE
-            BleDriverCli_SetMotorSpeed(motor_speed); // Send motor speed via BLE
-            BleDriverCli_SetMotorDirection(motor_dir); // Send motor direction via BLE
+                printf("MotSpeed: %d, MotDir: %d AdcVal: %d, AdcBat: %d\n", motor_speed, motor_dir, adc_value, adc_bat);
+                // printf("%d %d %d %d\n", motor_speed, motor_dir, adc_value, adc_bat);
+    
+                if(motor_speed != prev_motor_speed || motor_dir != prev_motor_dir) {  
+                    // Send motor speed and direction to BLE
+                    BleDriverCli_SetMotorSpeed(motor_speed); // Send motor speed via BLE
+                    BleDriverCli_SetMotorDirection(motor_dir); // Send motor direction via BLE
+                }
+
+                // Update previous values
+                prev_motor_speed = motor_speed;
+                prev_motor_dir = motor_dir;
+                prev_adc_val = adc_value;
+                prev_adc_bat = adc_bat;
+            }
+
 
             //read battery voltage and level via BLE
             float battery_voltage = BleDriverCli_GetBatteryVoltage();
