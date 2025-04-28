@@ -288,8 +288,9 @@ uint8_t BleDriverCli_GetBatteryLevel(void)
     return 0;
 }
 
-void BleDriverCli_SetMotorSpeed(uint8_t speed)
+bool BleDriverCli_SetMotorSpeed(uint8_t speed)
 {
+    bool result = false;
     // Send motor speed via BLE
     if (gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_SPEED].is_ready == true && 
         gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_SPEED].processing == false) {
@@ -308,11 +309,17 @@ void BleDriverCli_SetMotorSpeed(uint8_t speed)
             MY_LOGE(GATTC_TAG, "gattc write char failed, error code = %x", ret);
             gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_SPEED].processing = false; // Reset processing flag
         }
+        else {
+            result = true; // Set result to true if write was successful
+        }
     }
+
+    return result; // Return result of the operation
 }
 
-void BleDriverCli_SetMotorDirection(uint8_t direction)
+bool BleDriverCli_SetMotorDirection(uint8_t direction)
 {
+    bool result = false;
     // Send motor direction via BLE
     if (gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_DIRECTION].is_ready == true &&
         gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_DIRECTION].processing == false) {
@@ -332,7 +339,12 @@ void BleDriverCli_SetMotorDirection(uint8_t direction)
             MY_LOGE(GATTC_TAG, "gattc write char failed, error code = %x", ret);
             gl_profile_tab[PROFILE_MOTOR_APP_ID].chars[GATTS_CHAR_NUM_MOTOR_DIRECTION].processing = false; // Reset processing flag
         }
+        else {
+            result = true; // Set result to true if write was successful
+        }
     }
+
+    return result; // Return result of the operation
 }
 
 void BleDriverCli_Setup(void)
@@ -995,7 +1007,6 @@ static void espGattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_
         MY_LOGD(GATTC_TAG, "Disconnected, remote "ESP_BD_ADDR_STR", reason 0x%02x",
                  ESP_BD_ADDR_HEX(p_data->disconnect.remote_bda), p_data->disconnect.reason);
 
-        MY_LOGD(GATTC_TAG, "Start to scan again");
         // clear all profiles
         for(i = 0; i < PROFILE_NUM; i++){
             gl_profile_tab[i].is_found = false;
@@ -1013,6 +1024,7 @@ static void espGattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_
         memset(gattc_conn.remote_bda, 0, sizeof(esp_bd_addr_t));
         
 
+        MY_LOGD(GATTC_TAG, "Start to scan again");
         //trigger scan again
         scan_ret = esp_ble_gap_set_scan_params(&ble_scan_params);
         if (scan_ret){

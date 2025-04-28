@@ -10,58 +10,116 @@
 #include "ble_driver_cli.h"
 #include "pot_driver.h"
 
-//
+//state machine states
+typedef enum {
+    STATE_INIT,
+    STATE_IDLE,
+    STATE_WORKING,
+    STATE_ERROR,
+} state_t;
 
-void controller_task(void *pvParameters)
+static state_t current_state = STATE_INIT; // Initialize the state machine to the initial state
+
+static state_t state_working(void)
 {
     uint8_t motor_dir = 0;
     uint8_t motor_speed = 0;
 
     // previous values
-    int16_t prev_adc_val = 0;
-    int16_t prev_adc_bat = 0;
-    uint8_t prev_motor_speed = 0;
-    uint8_t prev_motor_dir = 0;
+    static uint8_t prev_motor_speed = 0;
+    static uint8_t prev_motor_dir = 0;
+
     // Main task
+    // Read ADC value
+    int16_t adc_value = adc_read_potentiometerRaw();
+    // printf("ADC Value: %d\n", adc_value);
+    float adc_voltage = adc_read_batteryVoltage();
+    int16_t adc_bat = adc_read_batteryRaw();
+    // printf("ADC Voltage: %.04f volts\n", adc_voltage);
+
+    // Calculate motor speed and direction based on ADC value
+    calculate_speed_and_direction(&motor_speed, &motor_dir, adc_value, adc_bat); // Calculate motor speed and direction based on ADC value
+    //if motor_speed, motor_dir, adc_value, adc_bat are same as previous values, skip sending to BLE
+    if(motor_speed != prev_motor_speed) {
+
+        
+        if(BleDriverCli_SetMotorSpeed(motor_speed) == true) // Send motor speed via BLE
+        {
+            printf("MotSpeed: %d, MotDir: %d AdcVal: %d, AdcBat: %d\n", motor_speed, motor_dir, adc_value, adc_bat);
+            // printf("%d %d %d %d\n", motor_speed, motor_dir, adc_value, adc_bat);
+
+            // Update previous values
+            prev_motor_speed = motor_speed;
+        }
+    }
+
+    if(motor_dir != prev_motor_dir) {
+
+        if( BleDriverCli_SetMotorDirection(motor_dir) == true) // Send motor direction via BLE
+        {
+            prev_motor_dir = motor_dir;
+        }
+    }
+
+
+    //read battery voltage and level via BLE
+    float battery_voltage = BleDriverCli_GetBatteryVoltage();
+    uint8_t battery_level = BleDriverCli_GetBatteryLevel();
+    // printf("Battery Voltage: %.02f V bettery level %d\n", battery_voltage, battery_level);
+    // ESP_LOGI("Task", "Motor Speed:%d Direction:%d Voltage:%.02f V Level:%d",adc_value >> 8, motor_dir, battery_voltage, battery_level);
+
+
+    return STATE_WORKING; // Return to the working state
+}
+
+static state_t state_machine(state_t state)
+{
+    switch (state)
+    {
+        case STATE_INIT:
+            // Initialize the state machine
+            state = STATE_IDLE; // Transition to the idle state
+            break;
+
+        case STATE_IDLE:
+            // Idle state, waiting for connection to ble device
+            if (BleDriverCli_IsReady() == true)
+            {
+                ESP_LOGI("Task", "BLE device is ready, starting working state...");
+                state = STATE_WORKING; // Transition to the working state
+            }
+            break;
+
+        case STATE_WORKING:
+            // Working state
+            state = state_working(); // Call the working function
+
+            if(BleDriverCli_IsReady() == false)
+            {
+                ESP_LOGI("Task", "BLE device is not ready, returning to idle state...");
+                state = STATE_IDLE; // Transition to the idle state if not ready
+            }
+            break;
+
+        case STATE_ERROR:
+            // Error state, handle errors
+            break;
+
+        default:
+            // Invalid state
+            break;
+    }
+
+    return state;
+}
+
+void controller_task(void *pvParameters)
+{
+
     while (1)
     {
-        if(BleDriverCli_IsReady() == true)
-        {
-            // Read ADC value
-            int16_t adc_value = adc_read_potentiometerRaw();
-            // printf("ADC Value: %d\n", adc_value);
-            float adc_voltage = adc_read_batteryVoltage();
-            int16_t adc_bat = adc_read_batteryRaw();
-            // printf("ADC Voltage: %.04f volts\n", adc_voltage);
-
-            // Calculate motor speed and direction based on ADC value
-            calculate_speed_and_direction(&motor_speed, &motor_dir, adc_value, adc_bat); // Calculate motor speed and direction based on ADC value
-            //if motor_speed, motor_dir, adc_value, adc_bat are same as previous values, skip sending to BLE
-            if(motor_speed != prev_motor_speed || motor_dir != prev_motor_dir || adc_value != prev_adc_val || adc_bat != prev_adc_bat) {
-
-                printf("MotSpeed: %d, MotDir: %d AdcVal: %d, AdcBat: %d\n", motor_speed, motor_dir, adc_value, adc_bat);
-                // printf("%d %d %d %d\n", motor_speed, motor_dir, adc_value, adc_bat);
-    
-                if(motor_speed != prev_motor_speed || motor_dir != prev_motor_dir) {  
-                    // Send motor speed and direction to BLE
-                    BleDriverCli_SetMotorSpeed(motor_speed); // Send motor speed via BLE
-                    BleDriverCli_SetMotorDirection(motor_dir); // Send motor direction via BLE
-                }
-
-                // Update previous values
-                prev_motor_speed = motor_speed;
-                prev_motor_dir = motor_dir;
-                prev_adc_val = adc_value;
-                prev_adc_bat = adc_bat;
-            }
-
-
-            //read battery voltage and level via BLE
-            float battery_voltage = BleDriverCli_GetBatteryVoltage();
-            uint8_t battery_level = BleDriverCli_GetBatteryLevel();
-            // printf("Battery Voltage: %.02f V bettery level %d\n", battery_voltage, battery_level);
-            // ESP_LOGI("Task", "Motor Speed:%d Direction:%d Voltage:%.02f V Level:%d",adc_value >> 8, motor_dir, battery_voltage, battery_level);
-        }
+        // Call the state machine function
+        current_state = state_machine(current_state);
         vTaskDelay(pdMS_TO_TICKS(50)); // Delay for 20ms
     }
 }

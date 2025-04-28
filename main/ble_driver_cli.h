@@ -35,8 +35,10 @@ uint8_t BleDriverCli_GetBatteryLevel(void);
  * This function sends the motor speed to the characteristic of the connected device.
  * 
  * @param speed The motor speed to be sent (0-255).
+ * 
+ * @return true if the speed was sent successfully, false otherwise.
  */
-void BleDriverCli_SetMotorSpeed(uint8_t speed);
+bool BleDriverCli_SetMotorSpeed(uint8_t speed);
 
 /**
  * @brief Sends the motor direction to the connected device.
@@ -44,8 +46,10 @@ void BleDriverCli_SetMotorSpeed(uint8_t speed);
  * This function sends the motor direction to the characteristic of the connected device.
  * 
  * @param direction The motor direction to be sent (0 for forward, 1 for backward).
+ * 
+ * @return true if the direction was sent successfully, false otherwise.
  */
-void BleDriverCli_SetMotorDirection(uint8_t direction);
+bool BleDriverCli_SetMotorDirection(uint8_t direction);
 
 /**
  * @brief Returns boolean value indicating if the connection is ready.
