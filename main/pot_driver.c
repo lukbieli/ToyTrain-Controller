@@ -110,6 +110,7 @@ void calculate_speed_and_direction(uint8_t *motor_speed, uint8_t *motor_dir,int1
         {
             *motor_speed = (uint8_t)((speed - 80.0) * 5.0); // Scale motor speed to [0, 100]
         }
+        // printf("%.2f %d %d %d\n", speed, adc_val, adc_bat, *motor_speed);
     }
 
     // printf("%.2f %d %d %d %d %d %d\n", speed, adc_val, adc_bat, dead_zone_min, dead_zone_max, *motor_speed, *motor_dir);

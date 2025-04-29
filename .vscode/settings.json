@@ -12,7 +12,8 @@
         "esp_gatt_common_api.h": "c",
         "chrono": "c",
         "variant": "c",
-        "ble_driver_cli.h": "c"
+        "ble_driver_cli.h": "c",
+        "string.h": "c"
     },
     "idf.flashType": "UART"
 }

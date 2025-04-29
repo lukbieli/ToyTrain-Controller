@@ -26,6 +26,10 @@
 #include "ble_driver_cli.h"
 #include "pot_driver.h"
 
+#define TIMEOUT_MS (60000) // Timeout in milliseconds
+#define UPDATE_MS (1000) // Update time in milliseconds
+#define LOOP_TIME_MS (50) // Loop time in milliseconds
+
 //state machine states
 typedef enum {
     STATE_INIT,
@@ -36,14 +40,21 @@ typedef enum {
 
 static state_t current_state = STATE_INIT; // Initialize the state machine to the initial state
 
+static uint32_t timeout_timer = 0; // Timer for timeout
+static uint32_t update_timer = 0; // Timer for update
+static bool timeout_flag = false; // Flag for timeout
+
+
 static state_t state_working(void)
 {
     uint8_t motor_dir = 0;
     uint8_t motor_speed = 0;
 
+    state_t state = STATE_WORKING; // Set the state to working
+
     // previous values
-    static uint8_t prev_motor_speed = 0;
-    static uint8_t prev_motor_dir = 0;
+    static uint8_t prev_motor_speed = 0xFF;
+    static uint8_t prev_motor_dir = 0xFF;
 
     // Main task
     // Read ADC value
@@ -58,7 +69,9 @@ static state_t state_working(void)
     //if motor_speed, motor_dir, adc_value, adc_bat are same as previous values, skip sending to BLE
     if(motor_speed != prev_motor_speed) {
 
-        
+        timeout_timer = 0; // Reset timer if motor speed has changed
+        update_timer = 0; // Reset timer if motor speed has changed
+        timeout_flag = false; // Reset timeout flag if motor speed has changed
         if(BleDriverCli_SetMotorSpeed(motor_speed) == true) // Send motor speed via BLE
         {
             printf("MotSpeed: %d, MotDir: %d AdcVal: %d, AdcBat: %d\n", motor_speed, motor_dir, adc_value, adc_bat);
@@ -66,6 +79,32 @@ static state_t state_working(void)
 
             // Update previous values
             prev_motor_speed = motor_speed;
+        }
+    }
+    else
+    {   
+        if((timeout_flag == false) && (update_timer > (UPDATE_MS/LOOP_TIME_MS))) // Check if update time has passed
+        {
+            update_timer = 0; // Reset timer
+            BleDriverCli_SetMotorSpeed(motor_speed); // Send motor speed via BLE
+            ESP_LOGI("Task", "Send update of motor speed: %d", motor_speed);
+        }
+        else
+        {
+            update_timer++; // Increment update timer
+        }
+        // Check if timeout has occurred
+        if(timeout_timer > (TIMEOUT_MS/LOOP_TIME_MS)) // Check if timeout has occurred
+        {
+            timeout_timer = 0; // Reset timer
+            timeout_flag = true; // Set timeout flag
+            BleDriverCli_SetMotorSpeed(0); // Stop motor if timeout occurs
+            ESP_LOGI("Task", "Timeout occurred, stopping motor.");
+            // printf("Timeout: %d %d %d %d\n", motor_speed, motor_dir, adc_value, adc_bat);
+        }
+        else
+        {
+            timeout_timer++; // Increment timeout timer
         }
     }
 
@@ -85,7 +124,7 @@ static state_t state_working(void)
     // ESP_LOGI("Task", "Motor Speed:%d Direction:%d Voltage:%.02f V Level:%d",adc_value >> 8, motor_dir, battery_voltage, battery_level);
 
 
-    return STATE_WORKING; // Return to the working state
+    return state; // Return state
 }
 
 static state_t state_machine(state_t state)
@@ -136,7 +175,7 @@ void controller_task(void *pvParameters)
     {
         // Call the state machine function
         current_state = state_machine(current_state);
-        vTaskDelay(pdMS_TO_TICKS(50)); // Delay for 20ms
+        vTaskDelay(pdMS_TO_TICKS(LOOP_TIME_MS)); // Delay for a short period to avoid busy waiting
     }
 }
 
