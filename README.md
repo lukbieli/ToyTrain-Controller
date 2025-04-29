@@ -1,32 +1,79 @@
-# _Sample project_
+# Toy Train Controller
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+This project is designed to control a toy train using an ESP32 microcontroller. It utilizes BLE (Bluetooth Low Energy) for communication, ADC (Analog-to-Digital Converter) for reading potentiometer values, and motor control logic to adjust the train's speed and direction.
 
-This is the simplest buildable example. The example is used by command `idf.py create-project`
-that copies the project to user specified path and set it's name. For more information follow the [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project)
+## Features
+- **BLE Communication**:
+  - Read battery voltage and level via BLE.
+  - Control motor speed and direction via BLE.
+- **ADC Integration**:
+  - Reads potentiometer values to calculate motor speed and direction.
+  - Dynamically adjusts motor behavior based on battery voltage.
+- **State Machine**:
+  - Implements a state machine with states: `INIT`, `IDLE`, `WORKING`, and `ERROR`.
+- **Motor Control**:
+  - Supports forward and reverse motor directions.
+  - Includes a dead zone to prevent unintentional motor movement.
 
+## How to Use
+1. **Hardware Setup**:
+   - Connect a linear potentiometer to the ADC pin of the ESP32.
+   - Connect the motor driver to the appropriate GPIO pins.
+   - Ensure the ESP32 is powered and connected to the toy train hardware.
 
+2. **Build and Flash**:
+   - Use the following commands to build and flash the project:
+     ```bash
+     idf.py build
+     idf.py flash
+     ```
+   - Monitor the output using:
+     ```bash
+     idf.py monitor
+     ```
 
-## How to use example
-We encourage the users to use the example as a template for the new projects.
-A recommended way is to follow the instructions on a [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project).
+3. **BLE Communication**:
+   - Use a BLE-compatible device (e.g., smartphone) to connect to the ESP32.
+   - Read battery voltage and level or send motor control commands via BLE.
 
-## Example folder contents
-
-The project **sample_project** contains one source file in C language [main.c](main/main.c). The file is located in folder [main](main).
-
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt`
-files that provide set of directives and instructions describing the project's source files and targets
-(executable, library, or both). 
-
-Below is short explanation of remaining files in the project folder.
+## Project Structure
 
 ```
 ├── CMakeLists.txt
 ├── main
 │   ├── CMakeLists.txt
-│   └── main.c
-└── README.md                  This is the file you are currently reading
+│   ├── main.c                  # Main application logic
+│   ├── pot_driver.c            # Potentiometer and ADC handling
+│   ├── ble_driver_cli.c        # BLE communication logic
+│   └── adc_driver.c            # ADC driver for reading raw values
+└── README.md                   # Project documentation
 ```
-Additionally, the sample project contains Makefile and component.mk files, used for the legacy Make based build system. 
-They are not used or needed when building with CMake and idf.py.
+
+## Key Components
+- **`main.c`**:
+  - Implements the state machine and main control logic.
+- **`pot_driver.c`**:
+  - Handles potentiometer readings and calculates motor speed and direction.
+- **`ble_driver_cli.c`**:
+  - Manages BLE communication for battery monitoring and motor control.
+- **`adc_driver.c`**:
+  - Provides low-level ADC functionality.
+
+## Dependencies
+- **ESP-IDF**:
+  - Ensure ESP-IDF v5.4 or later is installed.
+  - Follow the [ESP-IDF setup guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html) to configure your environment.
+
+## Example Output
+```
+MotSpeed: 50, MotDir: 1, AdcVal: 20000, AdcBat: 26592
+Battery Voltage: 3.70 V, Battery Level: 85%
+```
+
+## Future Improvements
+- Add support for additional BLE characteristics.
+- Implement advanced motor control algorithms.
+- Optimize ADC reading and processing for better performance.
+
+## License
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
