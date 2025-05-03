@@ -95,6 +95,7 @@ typedef struct {
     bool is_ready;             // Flag to check if the characteristic is ready
     bool request_notify;           // Flag to check if notification is requested
     volatile bool processing; // Flag to check if the characteristic is being processed
+    volatile bool new_data; // Flag to check if new data is available
 } ble_characteristic_t;
 
 
@@ -199,6 +200,8 @@ static gattc_profile_inst_t gl_profile_tab[PROFILE_NUM] = {
                 .descr_handle = 0,
                 .request_notify = true, // Request notification for battery level
                 .is_ready = false,
+                .new_data = false,
+                .processing = false,
             },
             [GATTS_CHAR_NUM_BATTERY_VOLTAGE] = {
                 .handle = 0,
@@ -216,6 +219,8 @@ static gattc_profile_inst_t gl_profile_tab[PROFILE_NUM] = {
                 .descr_handle = 0,
                 .request_notify = true, // Request notification for battery voltage
                 .is_ready = false,
+                .new_data = false,
+                .processing = false,
             }
         }
     },
@@ -248,6 +253,8 @@ static gattc_profile_inst_t gl_profile_tab[PROFILE_NUM] = {
                 .descr_handle = 0,
                 .request_notify = false,
                 .is_ready = false,
+                .new_data = false,
+                .processing = false,
             },
             [GATTS_CHAR_NUM_MOTOR_DIRECTION] = {
                 .handle = 0,
@@ -265,6 +272,8 @@ static gattc_profile_inst_t gl_profile_tab[PROFILE_NUM] = {
                 .descr_handle = 0,
                 .request_notify = false,
                 .is_ready = false,
+                .new_data = false,
+                .processing = false,
             }
         }
     }
@@ -282,26 +291,43 @@ bool BleDriverCli_IsReady(void)
     return false; // Connection is not ready
 }
 
-float BleDriverCli_GetBatteryVoltage(void)
+bool BleDriverCli_GetBatteryVoltage(float *voltage)
 {
+    bool result = false;
+
+    if(voltage == NULL) {
+        MY_LOGE(GATTC_TAG, "Invalid voltage pointer");
+        return false; // Return false if voltage pointer is NULL
+    }
     // Read battery voltage from the characteristic
     if (gl_profile_tab[PROFILE_BATTERY_APP_ID].chars[GATTS_CHAR_NUM_BATTERY_VOLTAGE].is_ready) {
         MY_LOGD(GATTC_TAG, "Read battery voltage via BLE");
-        float battery_voltage = convertUint8ArrToFloat((uint8_t *)gl_profile_tab[PROFILE_BATTERY_APP_ID].chars[GATTS_CHAR_NUM_BATTERY_VOLTAGE].attr_val.attr_value);
-        return battery_voltage; // Return battery voltage
+        *voltage = convertUint8ArrToFloat((uint8_t *)gl_profile_tab[PROFILE_BATTERY_APP_ID].chars[GATTS_CHAR_NUM_BATTERY_VOLTAGE].attr_val.attr_value);
+        if(gl_profile_tab[PROFILE_BATTERY_APP_ID].chars[GATTS_CHAR_NUM_BATTERY_VOLTAGE].new_data == true) {
+            gl_profile_tab[PROFILE_BATTERY_APP_ID].chars[GATTS_CHAR_NUM_BATTERY_VOLTAGE].new_data = false; // Reset new data flag
+            result = true; // Set result to true if new data is available
+        }
     }
-    return 0.0;
+    return result; // Return battery voltage
 }
 
-uint8_t BleDriverCli_GetBatteryLevel(void)
+bool BleDriverCli_GetBatteryLevel(uint8_t *level)
 {
+    bool result = false;
+    if(level == NULL) {
+        MY_LOGE(GATTC_TAG, "Invalid level pointer");
+        return false; // Return false if level pointer is NULL
+    }
     // Read battery level from the characteristic
     if (gl_profile_tab[PROFILE_BATTERY_APP_ID].chars[GATTS_CHAR_NUM_BATTERY_LEVEL].is_ready) {
         MY_LOGD(GATTC_TAG, "Read battery level via BLE");
-        uint8_t battery_level = *(uint8_t *)gl_profile_tab[PROFILE_BATTERY_APP_ID].chars[GATTS_CHAR_NUM_BATTERY_LEVEL].attr_val.attr_value;
-        return battery_level; // Return battery level
+        *level = *(uint8_t *)gl_profile_tab[PROFILE_BATTERY_APP_ID].chars[GATTS_CHAR_NUM_BATTERY_LEVEL].attr_val.attr_value;
+        if(gl_profile_tab[PROFILE_BATTERY_APP_ID].chars[GATTS_CHAR_NUM_BATTERY_LEVEL].new_data == true) {
+            gl_profile_tab[PROFILE_BATTERY_APP_ID].chars[GATTS_CHAR_NUM_BATTERY_LEVEL].new_data = false; // Reset new data flag
+            result = true; // Set result to true if new data is available
+        }
     }
-    return 0;
+    return result; // Return battery level
 }
 
 bool BleDriverCli_SetMotorSpeed(uint8_t speed)
@@ -944,6 +970,7 @@ static void espGattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_
             p_char->attr_val.attr_len = p_data->notify.value_len;
         }
         memcpy(p_char->attr_val.attr_value, p_data->notify.value, p_char->attr_val.attr_len);
+        p_char->new_data = true;
         MY_LOGD(GATTC_TAG, "Attribute value length: %d", p_char->attr_val.attr_len);
         break;
 

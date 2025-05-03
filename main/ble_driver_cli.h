@@ -32,18 +32,22 @@ void BleDriverCli_Setup(void);
  * 
  * This function reads the battery voltage from the characteristic of the connected device.
  * 
- * @return The battery voltage in volts.
+ * @param voltage Pointer to a float variable where the battery voltage will be stored.
+ * 
+ * @return true if data is new, false otherwise.
  */
-float BleDriverCli_GetBatteryVoltage(void);
+bool BleDriverCli_GetBatteryVoltage(float *voltage);
 
 /**
  * @brief Reads the battery level from the connected device.
  * 
  * This function reads the battery level from the characteristic of the connected device.
  * 
- * @return The battery level as a percentage (0-100).
+ * @param level Pointer to a uint8_t variable where the battery level will be stored. (0-100%).
+ * 
+ * @return true if data is new, false otherwise.
  */
-uint8_t BleDriverCli_GetBatteryLevel(void);
+bool BleDriverCli_GetBatteryLevel(uint8_t *level);
 
 /**
  * @brief Sends the motor speed to the connected device.

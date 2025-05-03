@@ -118,9 +118,18 @@ static state_t state_working(void)
 
 
     //read battery voltage and level via BLE
-    float battery_voltage = BleDriverCli_GetBatteryVoltage();
-    uint8_t battery_level = BleDriverCli_GetBatteryLevel();
-    // printf("Battery Voltage: %.02f V bettery level %d\n", battery_voltage, battery_level);
+    float battery_voltage = 0.0;
+    if(BleDriverCli_GetBatteryVoltage(&battery_voltage) == true) // Read battery voltage from the characteristic
+    {
+        ESP_LOGI("Task", "Battery Voltage: %.02f V\n", battery_voltage);
+    }
+    //read battery level via BLE
+    uint8_t battery_level = 0;
+    if(BleDriverCli_GetBatteryLevel(&battery_level) == true) // Read battery level from the characteristic
+    {
+        ESP_LOGI("Task", "Battery Level: %d%%\n", battery_level);
+    }
+
     // ESP_LOGI("Task", "Motor Speed:%d Direction:%d Voltage:%.02f V Level:%d",adc_value >> 8, motor_dir, battery_voltage, battery_level);
 
 
