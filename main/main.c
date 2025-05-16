@@ -25,6 +25,8 @@
 #include "i2cdev.h"
 #include "ble_driver_cli.h"
 #include "pot_driver.h"
+#include "led_rgb_driver.h"
+#include "led_single_driver.h"
 
 #define TIMEOUT_MS (60000) // Timeout in milliseconds
 #define UPDATE_MS (1000) // Update time in milliseconds
@@ -44,6 +46,35 @@ static uint32_t timeout_timer = 0; // Timer for timeout
 static uint32_t update_timer = 0; // Timer for update
 static bool timeout_flag = false; // Flag for timeout
 
+static void test_pot(void){
+    uint8_t motor_dir = 0;
+    uint8_t motor_speed = 0;
+
+    // previous values
+    static uint8_t prev_motor_speed = 0xFF;
+
+    // Main task
+    // Read ADC value
+    int16_t adc_value = adc_read_potentiometerRaw();
+    // printf("ADC Value: %d\n", adc_value);
+    float adc_voltage = adc_read_batteryVoltage();
+    int16_t adc_bat = adc_read_batteryRaw();
+    // printf("ADC Voltage: %.04f volts\n", adc_voltage);
+
+    // Calculate motor speed and direction based on ADC value
+    calculate_speed_and_direction(&motor_speed, &motor_dir, adc_value, adc_bat); // Calculate motor speed and direction based on ADC value
+    //if motor_speed, motor_dir, adc_value, adc_bat are same as previous values, skip sending to BLE
+    if(motor_speed != prev_motor_speed) {
+
+
+            printf("MotSpeed: %d, MotDir: %d AdcVal: %d, AdcBat: %d\n", motor_speed, motor_dir, adc_value, adc_bat);
+            // printf("%d %d %d %d\n", motor_speed, motor_dir, adc_value, adc_bat);
+
+            // Update previous values
+            prev_motor_speed = motor_speed;
+        
+    }
+}
 
 static state_t state_working(void)
 {
@@ -152,6 +183,7 @@ static state_t state_machine(state_t state)
                 ESP_LOGI("Task", "BLE device is ready, starting working state...");
                 state = STATE_WORKING; // Transition to the working state
             }
+            test_pot();
             break;
 
         case STATE_WORKING:
@@ -178,12 +210,52 @@ static state_t state_machine(state_t state)
 }
 
 void controller_task(void *pvParameters)
-{
+{    
+    LedSingleDriver_On(); // Turn on the single LED
+    LedSingleDriver_SetBrightness(255); // Set LED brightness to maximum
 
+    LedRgbDriver_SetColorRaw(255, 0, 0); // Set LED color to red
+    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+    LedSingleDriver_SetBrightness(200); 
+    // set color to green
+    LedRgbDriver_SetColorRaw(0, 255, 0); // Set LED color to green
+    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+    // set color to blue
+    LedRgbDriver_SetColorRaw(0, 0, 255); // Set LED color to blue
+    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+    // set color to white
+    LedRgbDriver_SetColorRaw(255, 255, 255); // Set LED color to white
+    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+
+    // enable blinking
+    LedRgbDriver_Blink(100); // Set LED color to white
+    vTaskDelay(pdMS_TO_TICKS(4000)); // Delay for 1 second
+
+    // stop blinking
+    LedRgbDriver_BlinkStop(); // Set LED color to white
+    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+    // set color yellow
+    LedRgbDriver_SetColorRaw(255, 255, 0); // Set LED color to yellow
+    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+    LedRgbDriver_Blink(400); // Set LED color to white
+
+    LedSingleDriver_SetBrightness(255); // Set LED brightness to maximum
+    LedSingleDriver_Blink(600); // Set LED color to white
     while (1)
     {
         // Call the state machine function
         current_state = state_machine(current_state);
+        vTaskDelay(pdMS_TO_TICKS(LOOP_TIME_MS)); // Delay for a short period to avoid busy waiting
+    }
+}
+
+void led_driver_task(void *pvParameters)
+{
+    while (1)
+    {
+        // Call the LED driver task
+        LedRgbDriver_Task();
+        LedSingleDriver_Task();
         vTaskDelay(pdMS_TO_TICKS(LOOP_TIME_MS)); // Delay for a short period to avoid busy waiting
     }
 }
@@ -193,12 +265,27 @@ void app_main(void)
     // Init library
     ESP_ERROR_CHECK(i2cdev_init());
 
+    // Init LED driver
+    LedRgbDriver_Init();
+    LedRgbDriver_SetColorRaw(0, 0, 0); // Set LED color to off
+
+    LedSingleDriver_Init();
+    LedSingleDriver_SetBrightness(255); // Set LED brightness to maximum
+    LedSingleDriver_Off(); // Turn off the LED
+
+
 
     // Start task
     xTaskCreatePinnedToCore(ads111x_task, "ads111x_task", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL, APP_CPU_NUM);
 
+    // Start led driver task
+    xTaskCreatePinnedToCore(led_driver_task, "led_driver_task", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL, APP_CPU_NUM);
+
     // main task
     xTaskCreatePinnedToCore(controller_task, "controller_task", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL, APP_CPU_NUM);
+
+
+
 
     // Start BLE task
     BleDriverCli_Setup();

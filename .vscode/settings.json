@@ -13,7 +13,8 @@
         "chrono": "c",
         "variant": "c",
         "ble_driver_cli.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "stdint.h": "c"
     },
     "idf.flashType": "UART"
 }
