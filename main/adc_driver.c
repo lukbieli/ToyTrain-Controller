@@ -39,6 +39,10 @@ static int16_t potenciometerValue = 0;
 static float potenciometerVoltage = 0;
 static int16_t batteryValue = 0;
 static float batteryVoltage = 0;
+static int16_t supplyValue = 0;
+static float supplyVoltage = 0;
+
+static bool data_ready = false;
 
 
 static void measure_channel(ads111x_mux_t channel, int16_t *result, float* voltage)
@@ -94,6 +98,24 @@ float adc_read_batteryVoltage(void)
     return batteryVoltage;
 }
 
+bool adc_is_data_ready(void)
+{
+    // Return data ready flag
+    return data_ready;
+}
+
+int16_t adc_read_supplyRaw(void)
+{
+    // Return ADC value
+    return supplyValue;
+}
+
+float adc_read_supplyVoltage(void)
+{
+    // Return ADC value
+    return supplyVoltage;
+}
+
 // Main task
 void ads111x_task(void *pvParameters)
 {
@@ -118,8 +140,11 @@ void ads111x_task(void *pvParameters)
         measure_channel(ADS111X_MUX_0_GND, &potenciometerValue, &potenciometerVoltage);
 
         // Measure channel 1
-        measure_channel(ADS111X_MUX_1_GND, &batteryValue, &batteryVoltage);
+        measure_channel(ADS111X_MUX_2_GND, &batteryValue, &batteryVoltage);
 
+        measure_channel(ADS111X_MUX_1_GND, &supplyValue, &supplyVoltage);
+
+        data_ready = true;
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }

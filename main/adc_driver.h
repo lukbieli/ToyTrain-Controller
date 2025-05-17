@@ -23,6 +23,8 @@ int16_t adc_read_potentiometerRaw(void);
 float adc_read_potentiometerVoltage(void);
 int16_t adc_read_batteryRaw(void);
 float adc_read_batteryVoltage(void);
-
+int16_t adc_read_supplyRaw(void);
+float adc_read_supplyVoltage(void);
+bool adc_is_data_ready(void);
 #endif // __ADC_DRIVER_H__
 // ADC_DRIVER_H

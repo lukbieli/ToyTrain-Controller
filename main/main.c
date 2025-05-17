@@ -57,17 +57,17 @@ static void test_pot(void){
     // Read ADC value
     int16_t adc_value = adc_read_potentiometerRaw();
     // printf("ADC Value: %d\n", adc_value);
-    float adc_voltage = adc_read_batteryVoltage();
-    int16_t adc_bat = adc_read_batteryRaw();
+    // float adc_voltage = adc_read_batteryVoltage();
+    int16_t adc_supply = adc_read_supplyRaw();
     // printf("ADC Voltage: %.04f volts\n", adc_voltage);
 
     // Calculate motor speed and direction based on ADC value
-    calculate_speed_and_direction(&motor_speed, &motor_dir, adc_value, adc_bat); // Calculate motor speed and direction based on ADC value
+    calculate_speed_and_direction(&motor_speed, &motor_dir, adc_value, adc_supply); // Calculate motor speed and direction based on ADC value
     //if motor_speed, motor_dir, adc_value, adc_bat are same as previous values, skip sending to BLE
     if(motor_speed != prev_motor_speed) {
 
 
-            printf("MotSpeed: %d, MotDir: %d AdcVal: %d, AdcBat: %d\n", motor_speed, motor_dir, adc_value, adc_bat);
+            printf("MotSpeed: %d, MotDir: %d AdcVal: %d, AdcBat: %d\n", motor_speed, motor_dir, adc_value, adc_supply);
             // printf("%d %d %d %d\n", motor_speed, motor_dir, adc_value, adc_bat);
 
             // Update previous values
@@ -91,12 +91,12 @@ static state_t state_working(void)
     // Read ADC value
     int16_t adc_value = adc_read_potentiometerRaw();
     // printf("ADC Value: %d\n", adc_value);
-    float adc_voltage = adc_read_batteryVoltage();
-    int16_t adc_bat = adc_read_batteryRaw();
+    // float adc_voltage = adc_read_batteryVoltage();
+    int16_t adc_supply = adc_read_supplyRaw();
     // printf("ADC Voltage: %.04f volts\n", adc_voltage);
 
     // Calculate motor speed and direction based on ADC value
-    calculate_speed_and_direction(&motor_speed, &motor_dir, adc_value, adc_bat); // Calculate motor speed and direction based on ADC value
+    calculate_speed_and_direction(&motor_speed, &motor_dir, adc_value, adc_supply); // Calculate motor speed and direction based on ADC value
     //if motor_speed, motor_dir, adc_value, adc_bat are same as previous values, skip sending to BLE
     if(motor_speed != prev_motor_speed) {
 
@@ -105,7 +105,7 @@ static state_t state_working(void)
         timeout_flag = false; // Reset timeout flag if motor speed has changed
         if(BleDriverCli_SetMotorSpeed(motor_speed) == true) // Send motor speed via BLE
         {
-            printf("MotSpeed: %d, MotDir: %d AdcVal: %d, AdcBat: %d\n", motor_speed, motor_dir, adc_value, adc_bat);
+            printf("MotSpeed: %d, MotDir: %d AdcVal: %d, AdcBat: %d\n", motor_speed, motor_dir, adc_value, adc_supply);
             // printf("%d %d %d %d\n", motor_speed, motor_dir, adc_value, adc_bat);
 
             // Update previous values
@@ -159,7 +159,20 @@ static state_t state_working(void)
     if(BleDriverCli_GetBatteryLevel(&battery_level) == true) // Read battery level from the characteristic
     {
         ESP_LOGI("Task", "Battery Level: %d%%\n", battery_level);
+        if(battery_level < 20)
+        {
+            // start blinking single LED
+            LedSingleDriver_Blink(1000); // Set LED color to white
+            LedSingleDriver_SetBrightness(255); // Set LED brightness to maximum
+            ESP_LOGI("Task", "Battery level is low, blinking LED.");
+        }
+        else
+        {
+            // stop blinking single LED
+            LedSingleDriver_Off();
+        }
     }
+
 
     // ESP_LOGI("Task", "Motor Speed:%d Direction:%d Voltage:%.02f V Level:%d",adc_value >> 8, motor_dir, battery_voltage, battery_level);
 
@@ -167,13 +180,63 @@ static state_t state_working(void)
     return state; // Return state
 }
 
+static state_t battery_monitor(state_t state)
+{
+    state_t next_state = state;
+
+    if(adc_is_data_ready() == true) // check if adc is ready
+    {
+        // read out controller battery voltage and level via BLE
+        float battery_voltage = adc_read_batteryVoltage() * 2.0; // read battery voltage 
+
+        // 
+
+        uint8_t battery_level = 0;
+        if(battery_voltage > 3.6)
+        {
+            // calculate battery level where 0% is 3.6 and 4.2 is 100%
+            battery_level = (battery_voltage - 3.6) / (4.2 - 3.6) * 100;
+            if(battery_level > 100)
+            {
+                battery_level = 100;
+            }
+        }
+
+        //set rgb to yellow if battery level is below 20%
+        if(battery_level < 15)
+        {
+            LedRgbDriver_SetColorRaw(255, 0,0); // Set LED color to red
+            LedRgbDriver_Blink(1000); // Set LED color to white
+            next_state = STATE_ERROR; // Set state to error
+            ESP_LOGI("Task", "Battery level is critical, blinking LED.");
+            printf("Battery Voltage: %.02f V %d%%\n", battery_voltage, battery_level);
+
+        }
+        else if( battery_level < 30)
+        {
+            LedRgbDriver_SetColorRaw(255, 255, 0); // Set LED color to yellow
+            ESP_LOGI("Task", "Battery level is low, LED is yellow.");
+        }
+        else
+        {
+            //do nothing
+        }
+    }
+
+    return next_state; // Return the next state
+}
+
 static state_t state_machine(state_t state)
 {
+    state = battery_monitor(state); // Call the battery monitor function
+
     switch (state)
     {
         case STATE_INIT:
             // Initialize the state machine
             state = STATE_IDLE; // Transition to the idle state
+            LedRgbDriver_SetColorRaw(0, 0, 255); // Set LED color to blue
+            LedRgbDriver_Blink(600); // Set LED color to blue
             break;
 
         case STATE_IDLE:
@@ -182,6 +245,8 @@ static state_t state_machine(state_t state)
             {
                 ESP_LOGI("Task", "BLE device is ready, starting working state...");
                 state = STATE_WORKING; // Transition to the working state
+                LedRgbDriver_SetColorRaw(0, 255, 0); // Set LED color to green
+                LedRgbDriver_BlinkStop(); // Stop blinking
             }
             test_pot();
             break;
@@ -194,11 +259,14 @@ static state_t state_machine(state_t state)
             {
                 ESP_LOGI("Task", "BLE device is not ready, returning to idle state...");
                 state = STATE_IDLE; // Transition to the idle state if not ready
+                LedRgbDriver_SetColorRaw(0, 0, 255); // Set LED color to blue
+                LedRgbDriver_Blink(600); // Set LED color to blue
             }
             break;
 
         case STATE_ERROR:
             // Error state, handle errors
+            LedRgbDriver_SetColorRaw(255, 0, 0); // Set LED color to red
             break;
 
         default:
@@ -211,36 +279,36 @@ static state_t state_machine(state_t state)
 
 void controller_task(void *pvParameters)
 {    
-    LedSingleDriver_On(); // Turn on the single LED
-    LedSingleDriver_SetBrightness(255); // Set LED brightness to maximum
+    // LedSingleDriver_On(); // Turn on the single LED
+    // LedSingleDriver_SetBrightness(255); // Set LED brightness to maximum
 
-    LedRgbDriver_SetColorRaw(255, 0, 0); // Set LED color to red
-    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
-    LedSingleDriver_SetBrightness(200); 
-    // set color to green
-    LedRgbDriver_SetColorRaw(0, 255, 0); // Set LED color to green
-    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
-    // set color to blue
-    LedRgbDriver_SetColorRaw(0, 0, 255); // Set LED color to blue
-    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
-    // set color to white
-    LedRgbDriver_SetColorRaw(255, 255, 255); // Set LED color to white
-    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+    // LedRgbDriver_SetColorRaw(255, 0, 0); // Set LED color to red
+    // vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+    // LedSingleDriver_SetBrightness(200); 
+    // // set color to green
+    // LedRgbDriver_SetColorRaw(0, 255, 0); // Set LED color to green
+    // vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+    // // set color to blue
+    // LedRgbDriver_SetColorRaw(0, 0, 255); // Set LED color to blue
+    // vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+    // // set color to white
+    // LedRgbDriver_SetColorRaw(255, 255, 255); // Set LED color to white
+    // vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
 
-    // enable blinking
-    LedRgbDriver_Blink(100); // Set LED color to white
-    vTaskDelay(pdMS_TO_TICKS(4000)); // Delay for 1 second
+    // // enable blinking
+    // LedRgbDriver_Blink(100); // Set LED color to white
+    // vTaskDelay(pdMS_TO_TICKS(4000)); // Delay for 1 second
 
-    // stop blinking
-    LedRgbDriver_BlinkStop(); // Set LED color to white
-    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
-    // set color yellow
-    LedRgbDriver_SetColorRaw(255, 255, 0); // Set LED color to yellow
-    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
-    LedRgbDriver_Blink(400); // Set LED color to white
+    // // stop blinking
+    // LedRgbDriver_BlinkStop(); // Set LED color to white
+    // vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+    // // set color yellow
+    // LedRgbDriver_SetColorRaw(255, 255, 0); // Set LED color to yellow
+    // vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
+    // LedRgbDriver_Blink(400); // Set LED color to white
 
-    LedSingleDriver_SetBrightness(255); // Set LED brightness to maximum
-    LedSingleDriver_Blink(600); // Set LED color to white
+    // LedSingleDriver_SetBrightness(255); // Set LED brightness to maximum
+    // LedSingleDriver_Blink(600); // Set LED color to white
     while (1)
     {
         // Call the state machine function
@@ -268,6 +336,7 @@ void app_main(void)
     // Init LED driver
     LedRgbDriver_Init();
     LedRgbDriver_SetColorRaw(0, 0, 0); // Set LED color to off
+    LedRgbDriver_SetBrightness(200); // Set LED brightness
 
     LedSingleDriver_Init();
     LedSingleDriver_SetBrightness(255); // Set LED brightness to maximum
